@@ -97,7 +97,6 @@ function App() {
       {state === 'idle' && (
         <div className="max-w-lg mx-auto p-4">
                     <h1 className="text-2xl font-bold text-center mb-4 text-white">Razer SI FAI Recording Tool v0.1</h1>
-          <div className="bg-green-600 text-white text-xs px-3 py-1 rounded-full inline-block mb-6">测试版</div>
 
           <button
             onClick={() => setState('scanning')}
