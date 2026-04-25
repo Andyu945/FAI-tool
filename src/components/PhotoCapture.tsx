@@ -4,7 +4,7 @@ import type { PhotoType } from '../types';
 interface PhotoCaptureProps {
   onCapture: (blob: Blob, itemIndex: number, type: PhotoType) => void;
   onFinish: () => void;
-  photoCount: number; // Total number of photos taken
+  photoCount: number;
   maxItems?: number;
 }
 
@@ -15,41 +15,69 @@ export default function PhotoCapture({
   maxItems = 12
 }: PhotoCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [pendingBlob, setPendingBlob] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  // Current item (1-based)
   const currentItem = Math.floor(photoCount / 2) + 1;
-  // Current type: GS if even photoCount (0,2,4...), Sample if odd (1,3,5...)
   const currentType: PhotoType = photoCount % 2 === 0 ? 'GS' : 'Sample';
 
+  const stopStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
   const initCamera = useCallback(() => {
+    stopStream();
+    setIsReady(false);
+    setError(null);
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setError('浏览器不支持相机访问');
+      return;
+    }
+
     navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' } }
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
     }).then(mediaStream => {
-      setStream(mediaStream);
+      streamRef.current = mediaStream;
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
         videoRef.current.play().then(() => {
           setIsReady(true);
+        }).catch(() => {
+          setError('视频播放失败');
         });
       }
-    }).catch(() => {
-      setError('无法访问相机');
+    }).catch((err) => {
+      console.error('Camera error:', err);
+      if (err.name === 'NotAllowedError') {
+        setError('请允许访问相机');
+      } else if (err.name === 'NotFoundError') {
+        setError('未找到相机');
+      } else if (err.name === 'NotReadableError') {
+        setError('相机被其他应用占用');
+      } else {
+        setError('无法访问相机');
+      }
     });
-  }, []);
+  }, [stopStream]);
 
   useEffect(() => {
     initCamera();
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      stopStream();
     };
-  }, []);
+  }, [retryKey, initCamera, stopStream]);
 
   const takePhoto = () => {
     if (!videoRef.current || !isReady) return;
@@ -73,12 +101,8 @@ export default function PhotoCapture({
   const retake = () => {
     setPendingBlob(null);
     setPreview(null);
-    // Restart camera for new capture
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-    }
-    setIsReady(false);
-    setTimeout(initCamera, 100);
+    stopStream();
+    setTimeout(() => setRetryKey(k => k + 1), 100);
   };
 
   const confirmPhoto = () => {
@@ -86,18 +110,18 @@ export default function PhotoCapture({
       onCapture(pendingBlob, currentItem, currentType);
       setPendingBlob(null);
       setPreview(null);
-      // Restart camera for next photo
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      setIsReady(false);
-      setTimeout(initCamera, 100);
+      stopStream();
+      setTimeout(() => setRetryKey(k => k + 1), 100);
     }
   };
 
   const finishWithPhoto = () => {
     confirmPhoto();
     setTimeout(onFinish, 200);
+  };
+
+  const handleRetry = () => {
+    setRetryKey(k => k + 1);
   };
 
   if (currentItem > maxItems) {
@@ -116,6 +140,12 @@ export default function PhotoCapture({
       {error ? (
         <div className="flex-1 flex flex-col items-center justify-center p-6">
           <p className="text-red-500 text-center mb-4">{error}</p>
+          <button
+            onClick={handleRetry}
+            className="px-6 py-3 bg-green-600 text-white rounded-xl font-medium mb-3"
+          >
+            重试
+          </button>
           <button onClick={onFinish} className="px-6 py-3 bg-gray-600 text-white rounded-xl font-medium">
             返回
           </button>
