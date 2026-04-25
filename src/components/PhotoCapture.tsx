@@ -100,9 +100,9 @@ export default function PhotoCapture({
     canvas.toBlob((blob) => {
       if (blob) {
         setPendingBlob(blob);
-        setPreview(canvas.toDataURL('image/jpeg', 1.0));
+        setPreview(canvas.toDataURL('image/png'));
       }
-    }, 'image/jpeg', 1.0);
+    }, 'image/png');
   };
 
   const retake = () => {
@@ -186,7 +186,7 @@ export default function PhotoCapture({
         </>
       ) : (
         <>
-          <div className="flex-[2] bg-gray-900 relative min-h-0">
+          <div className="bg-gray-900 relative" style={{ height: '80vh' }}>
             {!isReady && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <p className="text-white">相机启动中...</p>
@@ -197,7 +197,7 @@ export default function PhotoCapture({
               Item {currentItem} - {currentType}
             </div>
           </div>
-          <div className="flex-shrink-0 p-4 bg-gray-800">
+          <div className="p-4 bg-gray-800">
             <p className="text-gray-400 text-sm mb-2 text-center">
               {currentType === 'GS' ? '拍摄 GS (Golden Sample)' : '拍摄 Sample'}
             </p>
