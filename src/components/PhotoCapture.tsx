@@ -52,11 +52,14 @@ export default function PhotoCapture({
       streamRef.current = mediaStream;
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
-        videoRef.current.play().then(() => {
-          setIsReady(true);
-        }).catch(() => {
-          setError('视频播放失败');
-        });
+        videoRef.current.muted = true;
+        videoRef.current.playsInline = true;
+        videoRef.current.play().catch(() => {});
+        // Give browser time to initialize video, then set ready
+        setTimeout(() => setIsReady(true), 200);
+      } else {
+        console.error('Video element not found');
+        setError('视频元素未找到');
       }
     }).catch((err) => {
       console.error('Camera error:', err);
@@ -73,8 +76,12 @@ export default function PhotoCapture({
   }, [stopStream]);
 
   useEffect(() => {
-    initCamera();
+    // Small delay to ensure video element is mounted
+    const timer = setTimeout(() => {
+      initCamera();
+    }, 100);
     return () => {
+      clearTimeout(timer);
       stopStream();
     };
   }, [retryKey, initCamera, stopStream]);
@@ -136,7 +143,7 @@ export default function PhotoCapture({
   }
 
   return (
-    <div className="fixed inset-0 bg-black flex flex-col">
+    <div className="fixed inset-0 bg-black flex flex-col safe-area-bottom">
       {error ? (
         <div className="flex-1 flex flex-col items-center justify-center p-6">
           <p className="text-red-500 text-center mb-4">{error}</p>
@@ -152,10 +159,10 @@ export default function PhotoCapture({
         </div>
       ) : preview ? (
         <>
-          <div className="flex-1 bg-gray-900 flex items-center justify-center p-4">
+          <div className="flex-[2] bg-gray-900 flex items-center justify-center p-4 min-h-0">
             <img src={preview} alt="Preview" className="max-w-full max-h-full object-contain" />
           </div>
-          <div className="p-4 bg-gray-800">
+          <div className="flex-shrink-0 p-4 bg-gray-800">
             <p className="text-white text-center mb-4">
               Item {currentItem} - {currentType} | 已完成 {currentItem - 1} 个Item
             </p>
@@ -179,7 +186,7 @@ export default function PhotoCapture({
         </>
       ) : (
         <>
-          <div className="flex-1 bg-gray-900 relative">
+          <div className="flex-[2] bg-gray-900 relative min-h-0">
             {!isReady && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <p className="text-white">相机启动中...</p>
@@ -190,7 +197,7 @@ export default function PhotoCapture({
               Item {currentItem} - {currentType}
             </div>
           </div>
-          <div className="p-4 bg-gray-800">
+          <div className="flex-shrink-0 p-4 bg-gray-800">
             <p className="text-gray-400 text-sm mb-2 text-center">
               {currentType === 'GS' ? '拍摄 GS (Golden Sample)' : '拍摄 Sample'}
             </p>
